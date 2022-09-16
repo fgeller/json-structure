@@ -6,6 +6,50 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_identify_schema(t *testing.T) {
+	tcc := map[string]struct {
+		in       any
+		expected *jSchema
+	}{
+		"number": {
+			in:       23.42,
+			expected: &jSchema{Type: "number"},
+		},
+		"int": {
+			in:       42,
+			expected: &jSchema{Type: "number"},
+		},
+		"string": {
+			in:       "peter",
+			expected: &jSchema{Type: "string"},
+		},
+		"empty string": {
+			in:       "",
+			expected: &jSchema{Type: "string"},
+		},
+		"true": {
+			in:       true,
+			expected: &jSchema{Type: "boolean"},
+		},
+		"false": {
+			in:       false,
+			expected: &jSchema{Type: "boolean"},
+		},
+		"null": {
+			in:       nil,
+			expected: &jSchema{Type: "null"},
+		},
+	}
+
+	for tn, tc := range tcc {
+		tc := tc
+		t.Run(tn, func(t *testing.T) {
+			actual := schema(tc.in)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func Test_identify(t *testing.T) {
 	tcc := map[string]struct {
 		in       any
@@ -27,15 +71,15 @@ func Test_identify(t *testing.T) {
 		},
 		"true": {
 			in:       true,
-			expected: "bool",
+			expected: "boolean",
 		},
 		"false": {
 			in:       false,
-			expected: "bool",
+			expected: "boolean",
 		},
 		"nil": {
 			in:       nil,
-			expected: nil,
+			expected: "null",
 		},
 		"empty array": {
 			in:       []any{},
@@ -51,12 +95,12 @@ func Test_identify(t *testing.T) {
 		},
 		"array of any": {
 			in:       []any{"hans", nil, -23.22, nil, 2, true, []any{"peter"}, map[string]any{"key": 42.222}},
-			expected: []any{"string", nil, "number", nil, "number", "bool", []any{"string"}, map[string]any{"key": "number"}},
+			expected: []any{"string", "null", "number", "null", "number", "boolean", []any{"string"}, map[string]any{"key": "number"}},
 		},
 		"array of any - dedupe": {
 			in:       []any{"hans", nil, -23.22, nil, 2, true, []any{"peter"}, "hans", "peter", map[string]any{"key": 42.222}},
 			dedupe:   true,
-			expected: []any{"string", nil, "number", "bool", []any{"string"}, map[string]any{"key": "number"}},
+			expected: []any{"string", "null", "number", "boolean", []any{"string"}, map[string]any{"key": "number"}},
 		},
 		"array of any - merge objects": {
 			in: []any{
@@ -73,12 +117,12 @@ func Test_identify(t *testing.T) {
 			expected: []any{
 				"number",
 				map[string]any{
-					"key1": "any",
-					"key2": "bool",
-					"key3": map[string]any{"a": "bool", "b": "number"},
+					"key1": []string{"number", "string"},
+					"key2": "boolean",
+					"key3": map[string]any{"a": "boolean", "b": "number"},
 				},
-				[]any{nil},
-				"bool",
+				[]any{"null"},
+				"boolean",
 				"number",
 			},
 		},
@@ -99,12 +143,12 @@ func Test_identify(t *testing.T) {
 			expected: []any{
 				"number",
 				map[string]any{
-					"key1": "any",
-					"key2": "bool",
-					"key3": map[string]any{"a": "bool", "b": "number"},
+					"key1": []string{"number", "string"},
+					"key2": "boolean",
+					"key3": map[string]any{"a": "boolean", "b": "number"},
 				},
-				[]any{nil},
-				"bool",
+				[]any{"null"},
+				"boolean",
 			},
 		},
 		"empty map": {
@@ -127,8 +171,8 @@ func Test_identify(t *testing.T) {
 				"name":     "string",
 				"age":      "number",
 				"colors":   []any{"string", "string"},
-				"verified": "bool",
-				"email":    nil,
+				"verified": "boolean",
+				"email":    "null",
 			},
 		},
 	}
@@ -140,5 +184,4 @@ func Test_identify(t *testing.T) {
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
-
 }

@@ -6,41 +6,54 @@ import (
 	"reflect"
 )
 
-func identify(d any, dd, mo bool) any {
+type jSchema struct {
+	Schema      string              `json:"$schema,omitempty"`
+	ID          string              `json:"$id,omitempty"`
+	Title       string              `json:"title,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Type        string              `json:"type"`
+	Items       *jSchema            `json:"items"`
+	Properties  map[string]*jSchema `json:"properties,omitempty"`
+	Required    []string            `json:"required,omitempty"`
+}
+
+func schema(d any) *jSchema {
 	switch d.(type) {
 	case string:
-		return "string"
-	case float64, int:
-		return "number"
+		return &jSchema{Type: "string"}
+	case float64:
+		return &jSchema{Type: "number"}
+	case int:
+		return &jSchema{Type: "integer"}
 	case bool:
-		return "bool"
+		return &jSchema{Type: "boolean"}
+	case nil:
+		return &jSchema{Type: "null"}
 	case map[string]any:
 		m := d.(map[string]any)
+		js := &jSchema{Type: "object", Properties: map[string]*jSchema{}}
 		for k, v := range m {
-			m[k] = identify(v, dd, mo)
+			js.Properties[k] = schema(v)
 		}
-		return m
+		return nil
 	case []any:
 		s := d.([]any)
+		js := &jSchema{Type: "array"}
+		jss := make([]*jSchema, len(s))
 		if len(s) == 0 {
-			return s
+			return js
 		}
 		for i, v := range s {
-			s[i] = identify(v, dd, mo)
+			jss[i] = schema(v)
 		}
-		if dd {
-			s = dedupe(s)
-		}
-		if mo {
-			s = mergeArray(s)
-		}
+		jss = dedupe(jss)
+	}
+	// TODO merge?
 		return s
-	case nil:
-		return nil
 
 	default:
 		fmt.Fprintf(os.Stderr, "failed to identify type %T", d)
-		return d
+		return nil
 	}
 }
 
