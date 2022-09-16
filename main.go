@@ -8,8 +8,8 @@ import (
 )
 
 func main() {
-	dedupe := flag.Bool("dedupe", false, "dedupe elements of in arrays")
-	mergeObjects := flag.Bool("merge-objects", false, "merge objects in arrays")
+	flatten := flag.Bool("flatten", false, "flatten schemata in arrays and combine objects")
+	js := flag.Bool("schema", false, "output a json schema")
 	flag.Parse()
 
 	var d any
@@ -18,9 +18,15 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to decode json err=%v\n", err)
 		os.Exit(1)
 	}
-	pt := identify(d, *dedupe, *mergeObjects)
 
-	err = json.NewEncoder(os.Stdout).Encode(&pt)
+	s := schema(d, *flatten)
+	s.Schema = "https://json-schema.org/draft/2020-12/schema"
+	res := any(s)
+	if !*js {
+		res = s.toSimple()
+	}
+
+	err = json.NewEncoder(os.Stdout).Encode(&res)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to encode to json err=%v\n", err)
 		os.Exit(1)
