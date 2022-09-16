@@ -17,7 +17,7 @@ func Test_identify_schema(t *testing.T) {
 		},
 		"int": {
 			in:       42,
-			expected: &jSchema{Type: "number"},
+			expected: &jSchema{Type: "integer"},
 		},
 		"string": {
 			in:       "peter",
@@ -38,6 +38,84 @@ func Test_identify_schema(t *testing.T) {
 		"null": {
 			in:       nil,
 			expected: &jSchema{Type: "null"},
+		},
+		"empty object": {
+			in: map[string]any{},
+			expected: &jSchema{
+				Type:       "object",
+				Properties: map[string]*jSchema{},
+			},
+		},
+		"object with string values": {
+			in: map[string]any{"hans": "peter"},
+			expected: &jSchema{
+				Type: "object",
+				Properties: map[string]*jSchema{
+					"hans": {Type: "string"},
+				},
+			},
+		},
+		"object with different values": {
+			in: map[string]any{
+				"name":     "peter",
+				"age":      23,
+				"money":    42.11,
+				"verified": false,
+			},
+			expected: &jSchema{
+				Type: "object",
+				Properties: map[string]*jSchema{
+					"name":     {Type: "string"},
+					"age":      {Type: "integer"},
+					"money":    {Type: "number"},
+					"verified": {Type: "boolean"},
+				},
+			},
+		},
+		"empty array": {
+			in: []any{},
+			expected: &jSchema{
+				Type: "array",
+			},
+		},
+		"array of strings": {
+			in: []any{"red", "green", "blue"},
+			expected: &jSchema{
+				Type: "array",
+				Items: &jSchema{
+					Type: "string",
+				},
+			},
+		},
+		"array of objects": {
+			in: []any{
+				map[string]any{"name": "hans"},
+				map[string]any{"name": "peter"},
+			},
+			expected: &jSchema{
+				Type: "array",
+				Items: &jSchema{
+					Type:       "object",
+					Properties: map[string]*jSchema{"name": {Type: "string"}},
+				},
+			},
+		},
+		"array of any": {
+			in: []any{
+				"color",
+				map[string]any{"name": "hans"},
+				42,
+				map[string]any{"name": "peter"},
+				true,
+			},
+			expected: &jSchema{Type: "array"},
+		},
+		"array of different objects": {
+			in: []any{
+				map[string]any{"name": "hans"},
+				map[string]any{"age": 42},
+			},
+			expected: &jSchema{Type: "array"},
 		},
 	}
 
@@ -117,7 +195,7 @@ func Test_identify(t *testing.T) {
 			expected: []any{
 				"number",
 				map[string]any{
-					"key1": []string{"number", "string"},
+					"key1": "any",
 					"key2": "boolean",
 					"key3": map[string]any{"a": "boolean", "b": "number"},
 				},
@@ -143,7 +221,7 @@ func Test_identify(t *testing.T) {
 			expected: []any{
 				"number",
 				map[string]any{
-					"key1": []string{"number", "string"},
+					"key1": "any",
 					"key2": "boolean",
 					"key3": map[string]any{"a": "boolean", "b": "number"},
 				},

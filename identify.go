@@ -35,20 +35,74 @@ func schema(d any) *jSchema {
 		for k, v := range m {
 			js.Properties[k] = schema(v)
 		}
-		return nil
+		return js
 	case []any:
 		s := d.([]any)
-		js := &jSchema{Type: "array"}
-		jss := make([]*jSchema, len(s))
 		if len(s) == 0 {
-			return js
+			return &jSchema{Type: "array"}
 		}
+
+		jss := make([]*jSchema, len(s))
 		for i, v := range s {
 			jss[i] = schema(v)
 		}
-		jss = dedupe(jss)
+
+		djss := []*jSchema{jss[0]}
+	outer:
+		for _, v := range jss {
+			for _, dv := range djss {
+				if reflect.DeepEqual(v, dv) {
+					continue outer
+				}
+			}
+			djss = append(djss, v)
+		}
+
+		if len(djss) == 1 {
+			return &jSchema{
+				Type:  "array",
+				Items: djss[0],
+			}
+		}
+		fmt.Fprintf(os.Stderr, "unsupported heterogenous array")
+		return nil
+
+	default:
+		fmt.Fprintf(os.Stderr, "failed to identify type %T", d)
+		return nil
 	}
-	// TODO merge?
+}
+
+func identify(d any, dd, mo bool) any {
+	switch d.(type) {
+	case string:
+		return "string"
+	case float64, int:
+		return "number"
+	case bool:
+		return "boolean"
+	case nil:
+		return "null"
+	case map[string]any:
+		m := d.(map[string]any)
+		for k, v := range m {
+			m[k] = identify(v, dd, mo) // TODO(fg) 🤨
+		}
+		return m
+	case []any:
+		s := d.([]any)
+		if len(s) == 0 {
+			return s
+		}
+		for i, v := range s {
+			s[i] = identify(v, dd, mo)
+		}
+		if dd {
+			s = dedupe(s)
+		}
+		if mo {
+			s = mergeArray(s)
+		}
 		return s
 
 	default:
