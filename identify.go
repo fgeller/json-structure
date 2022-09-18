@@ -13,11 +13,12 @@ type jSchema struct {
 	Description string              `json:"description,omitempty"`
 	Type        string              `json:"type"`
 	Items       *jSchema            `json:"items"`
+	PrefixItems []*jSchema          `json:"prefixItems"`
 	Properties  map[string]*jSchema `json:"properties,omitempty"`
 	Required    []string            `json:"required,omitempty"`
 }
 
-func schema(d any) *jSchema {
+func schema(d any, dd, mo bool) *jSchema {
 	switch d.(type) {
 	case string:
 		return &jSchema{Type: "string"}
@@ -33,7 +34,7 @@ func schema(d any) *jSchema {
 		m := d.(map[string]any)
 		js := &jSchema{Type: "object", Properties: map[string]*jSchema{}}
 		for k, v := range m {
-			js.Properties[k] = schema(v)
+			js.Properties[k] = schema(v, dd, mo)
 		}
 		return js
 	case []any:
@@ -44,28 +45,37 @@ func schema(d any) *jSchema {
 
 		jss := make([]*jSchema, len(s))
 		for i, v := range s {
-			jss[i] = schema(v)
+			jss[i] = schema(v, dd, mo)
 		}
 
-		djss := []*jSchema{jss[0]}
-	outer:
-		for _, v := range jss {
-			for _, dv := range djss {
-				if reflect.DeepEqual(v, dv) {
-					continue outer
+		if dd {
+			djss := []*jSchema{jss[0]}
+		outer:
+			for _, v := range jss {
+				for _, dv := range djss {
+					if reflect.DeepEqual(v, dv) {
+						continue outer
+					}
 				}
+				djss = append(djss, v)
 			}
-			djss = append(djss, v)
+			jss = djss
 		}
 
-		if len(djss) == 1 {
+		if mo {
+			jss = mergeArray(jss)
+		}
+
+		if len(jss) == 1 {
 			return &jSchema{
 				Type:  "array",
-				Items: djss[0],
+				Items: jss[0],
 			}
 		}
-		fmt.Fprintf(os.Stderr, "unsupported heterogenous array")
-		return nil
+		return &jSchema{
+			Type:        "array",
+			PrefixItems: jss,
+		}
 
 	default:
 		fmt.Fprintf(os.Stderr, "failed to identify type %T", d)
@@ -131,15 +141,15 @@ func mergeArray(a []any) []any {
 	mo := map[string]any{}
 	fi := -1
 	for i, v := range a {
-		switch v.(type) {
+		switch any(v).(type) {
 		case map[string]any:
 			if fi == -1 {
 				fi = i
-				mo = v.(map[string]any)
+				mo = any(v).(map[string]any)
 				mvv = append(mvv, v)
 				continue
 			}
-			mo = merge(mo, v.(map[string]any))
+			mo = merge(mo, any(v).(map[string]any))
 
 		default:
 			mvv = append(mvv, v)

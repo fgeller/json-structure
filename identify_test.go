@@ -9,6 +9,8 @@ import (
 func Test_identify_schema(t *testing.T) {
 	tcc := map[string]struct {
 		in       any
+		dedupe   bool
+		merge    bool
 		expected *jSchema
 	}{
 		"number": {
@@ -82,6 +84,18 @@ func Test_identify_schema(t *testing.T) {
 			in: []any{"red", "green", "blue"},
 			expected: &jSchema{
 				Type: "array",
+				PrefixItems: []*jSchema{
+					{Type: "string"},
+					{Type: "string"},
+					{Type: "string"},
+				},
+			},
+		},
+		"array of strings - dedupe": {
+			in:     []any{"red", "green", "blue"},
+			dedupe: true,
+			expected: &jSchema{
+				Type: "array",
 				Items: &jSchema{
 					Type: "string",
 				},
@@ -94,9 +108,34 @@ func Test_identify_schema(t *testing.T) {
 			},
 			expected: &jSchema{
 				Type: "array",
-				Items: &jSchema{
-					Type:       "object",
-					Properties: map[string]*jSchema{"name": {Type: "string"}},
+				PrefixItems: []*jSchema{
+					{
+						Type:       "object",
+						Properties: map[string]*jSchema{"name": {Type: "string"}},
+					},
+					{
+						Type:       "object",
+						Properties: map[string]*jSchema{"name": {Type: "string"}},
+					},
+				},
+			},
+		},
+		"array of objects - dedupe": {
+			in: []any{
+				map[string]any{"name": "hans"},
+				map[string]any{"name": "peter"},
+			},
+			expected: &jSchema{
+				Type: "array",
+				PrefixItems: []*jSchema{
+					{
+						Type:       "object",
+						Properties: map[string]*jSchema{"name": {Type: "string"}},
+					},
+					{
+						Type:       "object",
+						Properties: map[string]*jSchema{"name": {Type: "string"}},
+					},
 				},
 			},
 		},
@@ -108,21 +147,73 @@ func Test_identify_schema(t *testing.T) {
 				map[string]any{"name": "peter"},
 				true,
 			},
-			expected: &jSchema{Type: "array"},
+			expected: &jSchema{
+				Type: "array",
+				PrefixItems: []*jSchema{
+					{Type: "string"},
+					{Type: "object", Properties: map[string]*jSchema{"name": {Type: "string"}}},
+					{Type: "integer"},
+					{Type: "object", Properties: map[string]*jSchema{"name": {Type: "string"}}},
+					{Type: "boolean"},
+				},
+			},
+		},
+		"array of any - dedupe": {
+			in: []any{
+				"color",
+				map[string]any{"name": "hans"},
+				"name",
+				42,
+				false,
+				map[string]any{"name": "peter"},
+				true,
+			},
+			dedupe: true,
+			expected: &jSchema{
+				Type: "array",
+				PrefixItems: []*jSchema{
+					{Type: "string"},
+					{Type: "object", Properties: map[string]*jSchema{"name": {Type: "string"}}},
+					{Type: "integer"},
+					{Type: "boolean"},
+				},
+			},
 		},
 		"array of different objects": {
 			in: []any{
 				map[string]any{"name": "hans"},
 				map[string]any{"age": 42},
 			},
-			expected: &jSchema{Type: "array"},
+			expected: &jSchema{
+				Type: "array",
+				PrefixItems: []*jSchema{
+					{Type: "object", Properties: map[string]*jSchema{"name": {Type: "string"}}},
+					{Type: "object", Properties: map[string]*jSchema{"age": {Type: "integer"}}},
+				},
+			},
+		},
+		"array of different objects - merge objects": {
+			in: []any{
+				map[string]any{"name": "hans"},
+				map[string]any{"age": 42},
+			},
+			expected: &jSchema{
+				Type: "array",
+				Items: &jSchema{
+					Type: "object",
+					Properties: map[string]*jSchema{
+						"name": {Type: "string"},
+						"age":  {Type: "integer"},
+					},
+				},
+			},
 		},
 	}
 
 	for tn, tc := range tcc {
 		tc := tc
 		t.Run(tn, func(t *testing.T) {
-			actual := schema(tc.in)
+			actual := schema(tc.in, tc.dedupe, tc.merge)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
